@@ -28,13 +28,29 @@ jobs:
         cache-path: ~/__cache
     - name: Set up Theos
       run: git clone --recursive --depth=1 'https://github.com/theos/theos.git' ~/theos
-    - name: Compile
-      id: package_build
+    - name: Install roothide headers
       run: |
-        gmake package THEOS=~/theos
-        echo "package=$(cat .theos/last_package)" >> $GITHUB_OUTPUT
-    - name: Upload a Build Artifact
+        git clone --depth=1 'https://github.com/roothide/roothide.git' ~/roothide
+        mkdir -p ~/theos/include ~/theos/lib
+        cp ~/roothide/roothide.h ~/theos/include/
+        cp ~/roothide/libroothide.tbd ~/theos/lib/
+
+    - name: Build (rootful)
+      run: |
+        gmake clean package THEOS=~/theos
+        mkdir -p /tmp/debs
+        cp .theos/last_package /tmp/debs/rootful_path
+        cp "$(cat .theos/last_package)" /tmp/debs/
+
+    - name: Build (roothide)
+      run: |
+        gmake clean package THEOS=~/theos ROOTHIDE=1
+        mkdir -p /tmp/debs
+        cp .theos/last_package /tmp/debs/roothide_path
+        cp "$(cat .theos/last_package)" /tmp/debs/
+
+    - name: Upload Artifacts
       uses: actions/upload-artifact@v3
       with:
         name: NewTerm3
-        path: '${{ steps.package_build.outputs.package }}'
+        path: /tmp/debs/*.deb
