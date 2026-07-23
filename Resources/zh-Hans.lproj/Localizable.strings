@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Generic title displayed before the terminal sets a proper title. -->
+	<key>TERMINAL</key>
+	<string>终端</string>
+
+	<!-- Title of Settings page. -->
+	<key>SETTINGS</key>
+	<string>设置</string>
+
+	<!-- Title of About page. -->
+	<key>ABOUT</key>
+	<string>关于 NewTerm</string>
+
+	<!-- VoiceOver label for the password manager button. -->
+	<key>PASSWORD_MANAGER</key>
+	<string>密码管理</string>
+
+	<!-- Message displayed in the terminal when it fails to start. -->
+	<key>TERMINAL_LAUNCH_FAILED</key>
+	<string>Shell 进程意外退出。</string>
+
+	<!-- Alert title displayed when a terminal could not be launched. -->
+	<key>TERMINAL_LAUNCH_FAILED_TITLE</key>
+	<string>无法启动终端，因为 Shell 进程意外退出。</string>
+
+	<!-- Alert body displayed when a terminal could not be launched. -->
+	<key>TERMINAL_LAUNCH_FAILED_BODY</key>
+	<string>请参考终端窗口中的错误消息了解更多详情。
+	你可能需要检查启动脚本或重新安装核心包来解决此问题。</string>
+
+	<!-- Title displayed when the terminal's process has ended. -->
+	<key>PROCESS_COMPLETED_TITLE</key>
+	<string>会话已结束</string>
+
+	<!-- VoiceOver label for the new tab button. -->
+	<key>NEW_TAB</key>
+	<string>新建标签</string>
+
+	<!-- VoiceOver label for the close tab button. -->
+	<key>CLOSE_TAB</key>
+	<string>关闭标签</string>
+
+	<!-- VoiceOver label for the new window button. -->
+	<key>NEW_WINDOW</key>
+	<string>新建窗口</string>
+
+	<!-- VoiceOver label for the close window button. -->
+	<key>CLOSE_WINDOW</key>
+	<string>关闭窗口</string>
+
+	<!-- VoiceOver label for a button that clears the terminal. -->
+	<key>CLEAR_TERMINAL</key>
+	<string>清除终端</string>
+
+	<!-- Label for a keyboard shortcut that selects the previous tab. -->
+	<key>SHOW_PREVIOUS_TAB</key>
+	<string>显示上一个标签</string>
+
+	<!-- Label for a keyboard shortcut that selects the next tab. -->
+	<key>SHOW_NEXT_TAB</key>
+	<string>显示下一个标签</string>
+
+	<!-- VoiceOver label for a button that splits the tab horizontally and adds a new terminal below. -->
+	<key>SPLIT_HORIZONTALLY</key>
+	<string>水平分割</string>
+
+	<!-- VoiceOver label for a button that splits the tab vertically and adds a new terminal to the right. -->
+	<key>SPLIT_VERTICALLY</key>
+	<string>垂直分割</string>
+
+	<!-- Settings option to use the operating system's locale. %@ is the user's operating system language. -->
+	<key>LOCALE_SYSTEM</key>
+	<string>系统语言：%@</string>
+
+	<!-- Close tab confirmation alert title. -->
+	<key>CLOSE_TAB_CONFIRM_MESSAGE</key>
+	<string>此终端会话将被终止且无法恢复。</string>
+
+	<!-- Close button in close tab confirmation alert. -->
+	<key>CLOSE</key>
+	<string>关闭</string>
+
+	<!-- Cancel button in close tab confirmation alert. -->
+	<key>CANCEL</key>
+	<string>取消</string>
+</dict>
+</plist>
