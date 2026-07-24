@@ -60,10 +60,11 @@ jobs:
 
       - name: Install roothide headers
         run: |
-          git clone --depth=1 https://github.com/roothide/roothide.git /tmp/roothide
           mkdir -p "$THEOS/include" "$THEOS/lib"
-          cp /tmp/roothide/roothide.h "$THEOS/include/"
-          cp /tmp/roothide/libroothide.tbd "$THEOS/lib/"
+          cp "$THEOS/vendor/include/roothide.h" "$THEOS/include/" 2>/dev/null || true
+          cp "$THEOS/vendor/include/roothide/roothide.h" "$THEOS/include/" 2>/dev/null || true
+          cp "$THEOS/vendor/lib/libroothide.tbd" "$THEOS/lib/" 2>/dev/null || true
+          cp "$THEOS/vendor/lib/iphone/roothide/libroothide.tbd" "$THEOS/lib/" 2>/dev/null || true
           ls -la "$THEOS/include/roothide.h" "$THEOS/lib/libroothide.tbd"
 
       - name: Build rootless
