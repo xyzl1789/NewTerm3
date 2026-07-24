@@ -397,8 +397,8 @@ class RootViewController: UIViewController {
 
 	private func sendActionToCurrentTerminal(_ selector: Selector) {
 		guard selectedTabIndex < terminals.count else { return }
-		let splitVC = terminals[selectedTabIndex]
-		guard let sessionVC = splitVC.viewControllers?.first as? TerminalSessionViewController else { return }
+		guard let splitVC = terminals[selectedTabIndex] as? TerminalSplitViewController,
+			  let sessionVC = splitVC.viewControllers?.first as? TerminalSessionViewController else { return }
 		if let responder = sessionOCResponder(in: sessionVC) {
 			responder.perform(selector)
 		}

@@ -57,7 +57,7 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 	private var hudView: UIHostingView<AnyView>!
 
 	// Search state
-	@State private var searchVisible = false
+	private var searchVisible = false
 	private var searchView: UIHostingView<AnyView>!
 	private let searchState = SearchState()
 
@@ -103,7 +103,7 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.separatorInset = .zero
-        tableView.backgroundColor = .clear
+        tableView.backgroundColor = UIColor.clear
 
         textView = tableView
 
@@ -172,7 +172,7 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 			.environmentObject(self.searchState)
 		))
 		searchView.translatesAutoresizingMaskIntoConstraints = false
-		searchView.backgroundColor = .clear
+		searchView.backgroundColor = UIColor.clear
 		searchView.isUserInteractionEnabled = true
 		searchView.isHidden = true
 		view.addSubview(searchView)
@@ -357,10 +357,21 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 		// Focus the field by finding the SwiftUI-hosted UITextField
 		DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
 			guard let self = self else { return }
-			if let textField = self.searchView.firstMatch(where: { $0 is UITextField }) as? UITextField {
+			if let textField = self.findFirstSubview(ofType: UITextField.self, in: self.searchView) {
 				textField.becomeFirstResponder()
 			}
 		}
+	}
+
+	/// Recursively search for the first subview matching the given type.
+	private func findFirstSubview<T: UIView>(ofType type: T.Type, in view: UIView) -> T? {
+		if let typed = view as? T { return typed }
+		for sub in view.subviews {
+			if let found = findFirstSubview(ofType: type, in: sub) {
+				return found
+			}
+		}
+		return nil
 	}
 
 	private func hideSearch() {
@@ -440,7 +451,7 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 		)
 		let host = UIHostingView(rootView: AnyView(panel))
 		host.translatesAutoresizingMaskIntoConstraints = false
-		host.backgroundColor = .clear
+		host.backgroundColor = UIColor.clear
 		host.layer.cornerRadius = 16
 		host.clipsToBounds = true
 		view.addSubview(host)
@@ -705,9 +716,9 @@ class SwiftUITableViewCell: UITableViewCell {
             hostingView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
         ])
         
-        self.backgroundColor = .clear
-        contentView.backgroundColor = .clear
-        hostingView.backgroundColor = .clear
+        self.backgroundColor = UIColor.clear
+        contentView.backgroundColor = UIColor.clear
+        hostingView.backgroundColor = UIColor.clear
     }
 }
 
@@ -730,8 +741,8 @@ extension TerminalSessionViewController: UITableViewDataSource {
         // Wrap with search highlight if needed
         if searchVisible && searchState.matchingRows.contains(indexPath.row) {
             let isCurrent = searchState.matchingRows.indices.contains(searchState.currentIndex) && searchState.matchingRows[searchState.currentIndex] == indexPath.row
-            let bgColor: Color = isCurrent ? Color.yellow.opacity(0.45) : Color.yellow.opacity(0.25)
-            cell.configure(with: view.background(bgColor))
+            let bgColor: SwiftUI.Color = isCurrent ? SwiftUI.Color.yellow.opacity(0.45) : SwiftUI.Color.yellow.opacity(0.25)
+            cell.configure(with: AnyView(view.background(bgColor)))
             return cell
         }
         cell.configure(with: view)

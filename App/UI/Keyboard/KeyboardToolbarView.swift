@@ -26,26 +26,27 @@ enum Toolbar: CaseIterable {
 	case primary, padPrimaryLeading, padPrimaryTrailing
 	case secondary, fnKeys, quickActions
 
-	var keys: [ToolbarKey] {
-	/// Apply user-customized layout if available.
+	/// User-customized layout if available, otherwise the default keys for this toolbar.
 	var customizedKeys: [ToolbarKey] {
 		let prefs = Preferences.shared
 		guard let data = prefs.customToolbarLayoutData,
 			  let layout = try? JSONDecoder().decode(CustomToolbarLayout.self, from: data) else {
-			return keys
+			return defaultKeys
 		}
 		switch self {
-		case .primary:            return layout.decodeKeys(for: layout.primary)
-		case .secondary:          return layout.decodeKeys(for: layout.secondary)
-		case .quickActions:       return layout.decodeKeys(for: layout.quickActions)
-		default:                  return keys
+		case .primary:      return layout.decodeKeys(for: layout.primary)
+		case .secondary:    return layout.decodeKeys(for: layout.secondary)
+		case .quickActions: return layout.decodeKeys(for: layout.quickActions)
+		default:            return defaultKeys
 		}
 	}
 
+	/// Default (built-in) key layout for this toolbar.
+	var defaultKeys: [ToolbarKey] {
 		switch self {
 		case .primary:
 			return [
-                .control, .escape, .tab, .Delete, //.more,
+				.control, .escape, .tab, .Delete, //.more,
 				.variableSpace(id: 0),
 				.arrows,
 				.variableSpace(id: 1),
@@ -80,6 +81,9 @@ enum Toolbar: CaseIterable {
 			]
 		}
 	}
+
+	/// Backwards-compatible accessor — equivalent to `defaultKeys`.
+	var keys: [ToolbarKey] { defaultKeys }
 }
 
 enum ToolbarKey: Hashable {
@@ -179,7 +183,7 @@ enum ToolbarKey: Hashable {
 								 preferredStyle: .icons,
 								 widthRatio: 1, minWidth: 30)
 		case .paste:      return Key(label: .localize("Paste"),
-								 imageName: .clipboard,
+								 imageName: .docOnClipboard,
 								 preferredStyle: .icons,
 								 widthRatio: 1, minWidth: 30)
 		case .clear:      return Key(label: .localize("Clear"),
@@ -402,7 +406,7 @@ struct KeyboardToolbarView: View {
 							.padding(.top, 5)
 
 						switch toolbar {
-						case .primary, .padPrimaryLeading, .padPrimaryTrailing, .secondary:
+						case .primary, .padPrimaryLeading, .padPrimaryTrailing, .secondary, .quickActions:
 							view
 
 						case .fnKeys:

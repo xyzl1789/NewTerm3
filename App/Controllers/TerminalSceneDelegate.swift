@@ -47,7 +47,8 @@ class TerminalSceneDelegate: UIResponder, UIWindowSceneDelegate, IdentifiableSce
 		#endif
 
 		// Restore initial command carried over from NSUserActivity (multi-scene activation)
-		if let command = connectionOptions.userActivity?.userInfo?["initialCommand"] as? String,
+		if let userInfo = connectionOptions.userActivity?.userInfo,
+		   let command = userInfo["initialCommand"] as? String,
 		   !command.isEmpty {
 			rootViewController.initialCommand = command
 		}

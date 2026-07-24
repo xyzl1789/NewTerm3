@@ -39,7 +39,7 @@ public class TerminalController {
 		set { stringSupplier.fontMetrics = newValue }
 	}
 
-    internal var terminal: Terminal?
+    public var terminal: Terminal?
 	private var subProcess: SubProcess?
 	private var subProcessFailureError: Error?
 	public let stringSupplier = StringSupplier()

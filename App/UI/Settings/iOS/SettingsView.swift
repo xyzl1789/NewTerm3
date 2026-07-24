@@ -123,7 +123,7 @@ struct SettingsView: View {
 
 		return NavigationView {
 			list
-				.navigationBarTitle("SETTINGS", displayMode: .large)
+				.navigationBarTitle("SETTINGS", displayMode: NavigationBarItem.TitleDisplayMode.large)
 				.navigationBarItems(trailing: Button(action: { self.dismiss() },
 																						 label: { Text(verbatim: .done).bold() }))
 		}
