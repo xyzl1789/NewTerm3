@@ -46,6 +46,12 @@ class TerminalSceneDelegate: UIResponder, UIWindowSceneDelegate, IdentifiableSce
 		scene.titlebar?.toolbarStyle = .unifiedCompact
 		#endif
 
+		// Restore initial command carried over from NSUserActivity (multi-scene activation)
+		if let command = connectionOptions.userActivity?.userInfo?["initialCommand"] as? String,
+		   !command.isEmpty {
+			rootViewController.initialCommand = command
+		}
+
 		preferencesUpdated()
 	}
 
@@ -56,19 +62,35 @@ class TerminalSceneDelegate: UIResponder, UIWindowSceneDelegate, IdentifiableSce
 			case "ssh":
 				createWindow(asTab: true, openingURL: url)
 
+			case "newterm":
+				if let command = parseNewTermURL(url) {
+					createWindow(asTab: true, initialCommand: command)
+				}
+
 			default: break
 			}
 		}
 	}
 
+	/// Parse `newterm://execute?cmd=<urlencoded>` URLs. Returns the decoded command, or nil on failure.
+	private func parseNewTermURL(_ url: URL) -> String? {
+		guard let host = url.host, host == "execute",
+			  let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+			  let cmdItem = components.queryItems?.first(where: { $0.name == "cmd" }),
+			  let cmd = cmdItem.value, !cmd.isEmpty else {
+			return nil
+		}
+		return cmd
+	}
+
 	// MARK: - Window management
 
-	func createWindow(asTab: Bool, openingURL url: URL? = nil) {
+	func createWindow(asTab: Bool, openingURL url: URL? = nil, initialCommand command: String? = nil) {
 		// Handle SSH URL
 		var sshPayload: String?
 		if let url = url,
-			 let host = url.host,
-			 url.scheme == "ssh" {
+		 let host = url.host,
+		 url.scheme == "ssh" {
 			sshPayload = host
 			if let user = url.user {
 				sshPayload = "\(user)@\(host)"
@@ -78,6 +100,9 @@ class TerminalSceneDelegate: UIResponder, UIWindowSceneDelegate, IdentifiableSce
 				sshPayload = "\(sshPayload!) -p \(port)"
 			}
 		}
+
+		// Generic command (e.g. from `newterm://execute?cmd=...`)
+		let commandPayload = command ?? (sshPayload.map { "ssh \($0)" })
 
 		if UIApplication.shared.supportsMultipleScenes {
 			let options = UIScene.ActivationRequestOptions()
@@ -93,11 +118,12 @@ class TerminalSceneDelegate: UIResponder, UIWindowSceneDelegate, IdentifiableSce
 			let activity = NSUserActivity(activityType: Self.activityType)
 			activity.userInfo = [:]
 			activity.userInfo!["sshPayload"] = sshPayload
+			activity.userInfo!["initialCommand"] = commandPayload
 
 			UIApplication.shared.requestSceneSessionActivation(nil, userActivity: activity, options: options, errorHandler: nil)
 		} else {
-			if let sshPayload = sshPayload {
-				rootViewController.initialCommand = "ssh \(sshPayload)"
+			if let commandPayload = commandPayload {
+				rootViewController.initialCommand = commandPayload
 			}
 			rootViewController.addTerminal()
 		}

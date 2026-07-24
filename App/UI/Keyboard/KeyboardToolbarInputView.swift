@@ -47,7 +47,6 @@ class KeyboardToolbarInputView: UIInputView {
     override func layoutSubviews() {
         super.layoutSubviews()
         delegate?.keyboardToolbarDidChangeHeight(height: self.frame.size.height)
-        NSLog("NewTermLog: KeyboardToolbarInputView.layoutSubviews frame=\(self.frame) safeArea=\(self.safeAreaInsets)\n\nhostview=\(hostingView.frame) hvcview=\(hostingView.get_rootViewHostingController?.view.frame) safeArea=\(hostingView.get_rootViewHostingController?.view.safeAreaInsets)")
     }
 
 	required init?(coder: NSCoder) {

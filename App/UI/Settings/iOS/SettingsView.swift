@@ -106,6 +106,12 @@ struct SettingsView: View {
 			}
 
 			PreferencesGroup {
+				NavigationLink(destination: SettingsQuickCommandsView(),
+												 label: { Text("Quick Commands") })
+				NavigationLink(destination: SettingsBackgroundView(),
+												 label: { Text("Background") })
+				NavigationLink(destination: SettingsKeyboardLayoutView(),
+												 label: { Text("Keyboard Layout") })
 				NavigationLink(destination: SettingsAboutView(),
 											 label: { Text("About") })
 			}

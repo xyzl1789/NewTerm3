@@ -109,7 +109,6 @@ class TerminalSplitViewController: BaseTerminalSplitViewControllerChild {
 	}
 
 	override func viewSafeAreaInsetsDidChange() {
-        NSLog("NewTermLog: TerminalSplitViewController.viewSafeAreaInsetsDidChange view.safeAreaInsets=\(view.safeAreaInsets)")
 		super.viewSafeAreaInsetsDidChange()
 		updateConstraints()
 	}
@@ -244,7 +243,6 @@ class TerminalSplitViewController: BaseTerminalSplitViewControllerChild {
 	// MARK: - Keyboard
     private var keyboardToolbarHeight: Double = 0
     public func keyboardToolbarHeightChanged(height: Double) {
-        NSLog("NewTermLog: T\(terminalIndex) keyboardToolbarHeightChanged \(height)-\(self.parent?.view.safeAreaInsets.bottom) keyboardVisible=\(keyboardVisible)")
         if UIDevice.current.userInterfaceIdiom == .pad && !keyboardVisible {
             //Floating Keyboard
             let bottomInset = self.parent?.view.safeAreaInsets.bottom ?? 0
@@ -254,8 +252,7 @@ class TerminalSplitViewController: BaseTerminalSplitViewControllerChild {
     }
 
     @objc func keyboardVisibilityChanged(_ notification: Notification) {
-        NSLog("NewTermLog: T\(terminalIndex) keyboardVisibilityChanged \(notification.name.rawValue) visible=\(keyboardVisible) local=\(notification.userInfo?[UIResponder.keyboardIsLocalUserInfoKey] ?? "")  \(notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] ?? "")")
-        
+
         guard let userInfo = notification.userInfo,
               let isLocal = userInfo[UIResponder.keyboardIsLocalUserInfoKey] as? Bool,
               let keyboardFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
@@ -281,12 +278,10 @@ class TerminalSplitViewController: BaseTerminalSplitViewControllerChild {
         // We update the safe areas in an animation block to force it to be animated with the exact
         // parameters given to us in the notification.
         func update(bottom: CGFloat) {
-            NSLog("NewTermLog: T\(terminalIndex) keyboardVisibilityChanged update bottom=\(bottom) parent=\(self.parent?.view.safeAreaInsets.bottom)")
             if self.additionalSafeAreaInsets.bottom.isEqual(to: bottom) {
-                NSLog("NewTermLog: T\(terminalIndex) keyboardVisibilityChanged update ignored")
                 return
             }
-            
+
             var options: UIView.AnimationOptions = .beginFromCurrentState
             options.insert(.init(rawValue: curve << 16))
 

@@ -90,5 +90,37 @@ You may need to review startup scripts or reinstall core packages to fix this is
 	<!-- Cancel button in close tab confirmation alert. -->
 	<key>CANCEL</key>
 	<string>Cancel</string>
+
+	<!-- Quick action: copy terminal buffer to clipboard. -->
+	<key>Copy</key>
+	<string>Copy</string>
+
+	<!-- Quick action: paste clipboard to terminal. -->
+	<key>Paste</key>
+	<string>Paste</string>
+
+	<!-- Quick action: clear terminal screen. -->
+	<key>Clear</key>
+	<string>Clear</string>
+
+	<!-- Quick action: select all terminal text. -->
+	<key>Select All</key>
+	<string>Select All</string>
+
+	<!-- Quick action toolbar toggle. -->
+	<key>Quick Actions</key>
+	<string>Quick Actions</string>
+
+	<!-- VoiceOver label for increasing font size shortcut. -->
+	<key>FONT_SIZE_INCREASE</key>
+	<string>Increase Font Size</string>
+
+	<!-- VoiceOver label for decreasing font size shortcut. -->
+	<key>FONT_SIZE_DECREASE</key>
+	<string>Decrease Font Size</string>
+
+	<!-- VoiceOver label for resetting font size shortcut. -->
+	<key>FONT_SIZE_RESET</key>
+	<string>Reset Font Size</string>
 </dict>
 </plist>

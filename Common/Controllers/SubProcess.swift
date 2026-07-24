@@ -313,7 +313,6 @@ class SubProcess {
 			// Read from output and notify delegate.
 			let bytes = buffer.bindMemory(to: UTF8Char.self, capacity: bytesRead)
 			let data = Array(UnsafeBufferPointer(start: bytes, count: bytesRead))
-            NSLog("NewTermLog: read=\(String(data: Data(data), encoding: .ascii))")
 			delegate?.subProcess(didReceiveData: data)
 		}
 		buffer.deallocate()
@@ -324,7 +323,6 @@ class SubProcess {
 			guard let fileDescriptor = self.fileDescriptor else {
 				return
 			}
-            NSLog("NewTermLog: write=\(String(data: Data(data), encoding: .ascii)) : \(data)")
 			_ = data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
 				Darwin.write(fileDescriptor, buffer.baseAddress!, buffer.count)
 			}

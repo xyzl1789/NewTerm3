@@ -27,7 +27,8 @@ extension ToolbarKey {
         case .Delete:   return EscapeSequences.Delete
 		case .fnKey(let index): return EscapeSequences.fn[index - 1]
 		case .fixedSpace, .variableSpace, .arrows,
-				 .control, .more, .fnKeys:
+				 .control, .more, .fnKeys,
+				 .copy, .paste, .clear, .selectAll, .quickActions:
 			return []
 		}
 	}
@@ -79,7 +80,7 @@ class TerminalKeyInput: TextInputBase {
 		smartDashesType = .no
 		smartInsertDeleteType = .no
 
-		var toolbars: [Toolbar] = [.fnKeys, .secondary]
+		var toolbars: [Toolbar] = [.fnKeys, .secondary, .quickActions]
 //		if UIDevice.current.userInterfaceIdiom == .pad {
 //			let leadingView = KeyboardToolbarPadItemView(delegate: self,
 //																									 toolbar: .padPrimaryLeading,
@@ -417,12 +418,29 @@ extension TerminalKeyInput: KeyboardToolbarViewDelegate {
 			return
 		}
 
+		// Quick actions do not write to terminal; they trigger UIKit actions.
+		switch key {
+		case .copy:
+			copy(nil)
+			return
+		case .paste:
+			paste(nil)
+			return
+		case .clear:
+			clearTerminalAction()
+			return
+		case .selectAll:
+			selectAllAction()
+			return
+		default: break
+		}
+
 		terminalInputDelegate.receiveKeyboardInput(data: key.keySequence(applicationCursor: terminalInputDelegate.applicationCursor))
-        
+
         if key != .control && state.toggledKeys.contains(.control) {
             state.toggledKeys.remove(.control)
         }
-        
+
 		switch key {
 		case .more:
 			// Also hide fn row if currently toggled
@@ -432,6 +450,16 @@ extension TerminalKeyInput: KeyboardToolbarViewDelegate {
 
 		default: break
 		}
+	}
+
+	// MARK: - Quick Actions
+
+	private func clearTerminalAction() {
+		terminalInputDelegate?.receiveKeyboardInput(data: [0x0c])
+	}
+
+	private func selectAllAction() {
+		copy(nil)
 	}
 
 	func keyboardToolbarDidBeginPressingKey(_ key: ToolbarKey) {

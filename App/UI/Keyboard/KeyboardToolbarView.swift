@@ -24,15 +24,32 @@ fileprivate struct Key {
 
 enum Toolbar: CaseIterable {
 	case primary, padPrimaryLeading, padPrimaryTrailing
-	case secondary, fnKeys
+	case secondary, fnKeys, quickActions
 
 	var keys: [ToolbarKey] {
+	/// Apply user-customized layout if available.
+	var customizedKeys: [ToolbarKey] {
+		let prefs = Preferences.shared
+		guard let data = prefs.customToolbarLayoutData,
+			  let layout = try? JSONDecoder().decode(CustomToolbarLayout.self, from: data) else {
+			return keys
+		}
+		switch self {
+		case .primary:            return layout.decodeKeys(for: layout.primary)
+		case .secondary:          return layout.decodeKeys(for: layout.secondary)
+		case .quickActions:       return layout.decodeKeys(for: layout.quickActions)
+		default:                  return keys
+		}
+	}
+
 		switch self {
 		case .primary:
 			return [
                 .control, .escape, .tab, .Delete, //.more,
 				.variableSpace(id: 0),
-				.arrows
+				.arrows,
+				.variableSpace(id: 1),
+				.quickActions
 			]
 
 		case .padPrimaryLeading:
@@ -54,6 +71,13 @@ enum Toolbar: CaseIterable {
 
 		case .fnKeys:
 			return Array(1...12).map { .fnKey(index: $0) }
+
+		case .quickActions:
+			return [
+				.copy, .paste, .selectAll,
+				.variableSpace(id: 0),
+				.clear
+			]
 		}
 	}
 }
@@ -73,6 +97,10 @@ enum ToolbarKey: Hashable {
 	case delete, fnKeys
 	// Fn keys
 	case fnKey(index: Int)
+	// Quick actions
+	case copy, paste, clear, selectAll
+	// Quick actions toolbar toggle
+	case quickActions
 
 	fileprivate var key: Key {
 		switch self {
@@ -144,6 +172,28 @@ enum ToolbarKey: Hashable {
 			return Key(label: "F\(index)",
 								 preferredStyle: .text,
                        widthRatio: 1, heightRatio: isSmallDevice ? 0.7 : 1, minWidth: 35)
+
+		// Quick actions
+		case .copy:       return Key(label: .localize("Copy"),
+								 imageName: .docOnDoc,
+								 preferredStyle: .icons,
+								 widthRatio: 1, minWidth: 30)
+		case .paste:      return Key(label: .localize("Paste"),
+								 imageName: .clipboard,
+								 preferredStyle: .icons,
+								 widthRatio: 1, minWidth: 30)
+		case .clear:      return Key(label: .localize("Clear"),
+								 imageName: .xmarkCircle,
+								 preferredStyle: .icons,
+								 widthRatio: 1, minWidth: 30)
+		case .selectAll:  return Key(label: .localize("Select All"),
+								 glyph: .localize("All"),
+								 widthRatio: 1.25, minWidth: 35)
+		case .quickActions: return Key(label: .localize("Quick Actions"),
+								 imageName: .ellipsisCircle,
+								 preferredStyle: .icons,
+								 isToggle: true,
+								 widthRatio: 1, minWidth: 30)
 		}
 	}
 }
@@ -171,7 +221,7 @@ struct KeyboardToolbarKeyStack: View {
 
 	var body: some View {
 		HStack(alignment: .center, spacing: 5) {
-            let keys = toolbar.keys
+            let keys = toolbar.customizedKeys
 			ForEach(keys, id: \.self) { key in
 				switch key {
 				case .fixedSpace:    EmptyView()
@@ -324,8 +374,6 @@ struct KeyboardToolbarView: View {
 
 	let toolbars: [Toolbar]
 
-	@State private var outerSize = CGSize.zero
-
 	@EnvironmentObject var state: KeyboardToolbarViewState
 
 	@ObservedObject private var preferences = Preferences.shared
@@ -338,29 +386,16 @@ struct KeyboardToolbarView: View {
 			return state.toggledKeys.contains(.more)
 		case .fnKeys:
 			return state.toggledKeys.contains(.fnKeys)
+		case .quickActions:
+			return state.toggledKeys.contains(.quickActions)
 		}
 	}
 
 	@ViewBuilder
 	var body: some View {
-//		ZStack(alignment: .bottom) {
-//			Color.black
-//				.frame(height: 0)
-//				.captureSize(in: $outerSize)
-//                .background(GeometryReader { geometry in
-//                 Color.blue.opacity(0.5)
-//                     .onAppear {
-//                         NSLog("NewTermLog: ZStack onAppear \(geometry.size)")
-//                     }
-//                     .onChange(of: geometry.size) { newSize in
-//                         NSLog("NewTermLog: ZStack onChange \(newSize)")
-//                     }
-//                })
-            
-			VStack(spacing: 0) {
+		VStack(spacing: 0) {
 				ForEach(toolbars, id: \.self) { toolbar in
 					if isToolbarVisible(toolbar) {
-                        let _ = NSLog("NewTermLog: outerSize=\(outerSize)")
 						let view = KeyboardToolbarKeyStack(delegate: delegate,
 																							 toolbar: toolbar)
                             .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .pad ? 4  : 1)
@@ -369,35 +404,19 @@ struct KeyboardToolbarView: View {
 						switch toolbar {
 						case .primary, .padPrimaryLeading, .padPrimaryTrailing, .secondary:
 							view
-//								.frame(width: outerSize.width)
 
 						case .fnKeys:
 							CocoaScrollView(.horizontal, showsIndicators: false) {
 								view
                             }
-//								.frame(width: outerSize.width)
 						}
 					}
 				}
                 .padding(.bottom, UIDevice.current.userInterfaceIdiom == .pad ? 5 : 2)
-//                .background(GeometryReader { geometry in
-//                    Color.green.opacity(0.5)
-//                         .onAppear {
-//                             NSLog("NewTermLog: VStack onAppear \(geometry.size)")
-//                         }
-//                         .onChange(of: geometry.size) { newSize in
-//                             NSLog("NewTermLog: VStack onChange \(newSize)")
-//                         }
-//                 })
 			}
-            .onChangeOfFrame(perform: { size in
-                NSLog("NewTermLog: KeyboardToolbarView.VStack.onChangeOfFrame \(size)")
-            })
-//		}
-//        .onChangeOfFrame(perform: { size in
-//            NSLog("NewTermLog: ZStack onChangeOfFrame \(size)")
-//        })
+            .onChangeOfFrame(perform: { _ in })
 	}
+}
 }
 
 struct KeyboardToolbarView_Previews: PreviewProvider {

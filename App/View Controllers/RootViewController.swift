@@ -81,17 +81,45 @@ class RootViewController: UIViewController {
 																 modifierFlags: [.command, .shift]))
 		}
 
-//		addKeyCommand(UIKeyCommand(title: .localize("SPLIT_HORIZONTALLY"),
-//															 action: #selector(self.splitHorizontally),
-//															 input: "d",
-//															 modifierFlags: [.command, .shift]))
-//		addKeyCommand(UIKeyCommand(title: .localize("SPLIT_VERTICALLY"),
-//															 action: #selector(self.splitVertically),
-//															 input: "d",
-//															 modifierFlags: .command))
+		// Split view shortcuts
+		addKeyCommand(UIKeyCommand(title: .localize("SPLIT_HORIZONTALLY"),
+															 action: #selector(self.splitHorizontally),
+															 input: "d",
+															 modifierFlags: .command))
+		addKeyCommand(UIKeyCommand(title: .localize("SPLIT_VERTICALLY"),
+															 action: #selector(self.splitVertically),
+															 input: "d",
+															 modifierFlags: [.command, .shift]))
 
+		// Terminal actions
+		addKeyCommand(UIKeyCommand(title: .localize("CLEAR_TERMINAL", comment: "VoiceOver label for a button that clears the terminal."),
+															 action: #selector(self.clearCurrentTerminal),
+															 input: "k",
+															 modifierFlags: .command))
+		addKeyCommand(UIKeyCommand(title: .localize("Copy", comment: "VoiceOver label for a button that copies the terminal buffer."),
+															 action: #selector(self.copyCurrentTerminal),
+															 input: "c",
+															 modifierFlags: .command))
+		addKeyCommand(UIKeyCommand(title: .localize("Paste", comment: "VoiceOver label for a button that pastes to the terminal."),
+															 action: #selector(self.pasteToCurrentTerminal),
+															 input: "v",
+															 modifierFlags: .command))
 
-		NotificationCenter.default.addObserver(self, selector: #selector(self.preferencesUpdated), name: Preferences.didChangeNotification, object: nil)
+		// Font size shortcuts
+		addKeyCommand(UIKeyCommand(title: .localize("FONT_SIZE_INCREASE", comment: "VoiceOver label for increasing font size."),
+															 action: #selector(self.increaseFontSize),
+															 input: "+",
+															 modifierFlags: .command))
+		addKeyCommand(UIKeyCommand(title: .localize("FONT_SIZE_DECREASE", comment: "VoiceOver label for decreasing font size."),
+															 action: #selector(self.decreaseFontSize),
+															 input: "-",
+															 modifierFlags: .command))
+		addKeyCommand(UIKeyCommand(title: .localize("FONT_SIZE_RESET", comment: "VoiceOver label for resetting font size."),
+															 action: #selector(self.resetFontSize),
+															 input: "0",
+															 modifierFlags: .command))
+
+	NotificationCenter.default.addObserver(self, selector: #selector(self.preferencesUpdated), name: Preferences.didChangeNotification, object: nil)
 		NotificationCenter.default.addObserver(self, selector: #selector(self.dismissSettings), name: Self.settingsViewDoneNotification, object: nil)
 
 		preferencesUpdated()
@@ -100,11 +128,8 @@ class RootViewController: UIViewController {
 	override func viewWillLayoutSubviews() {
 		super.viewWillLayoutSubviews()
 
-		// TODO: Cleanup
 		#if !targetEnvironment(macCatalyst)
-//		let isWide = isBigDevice || view.frame.size.width > 450
 		let topBarHeight: CGFloat = UIDevice.current.userInterfaceIdiom != .pad ? 33 : 66
-        NSLog("NewTermLog: topBarHeight=\(topBarHeight) view.safeAreaInsets=\(view.safeAreaInsets) view.frame=\(view.frame)")
 		tabToolbar?.view.frame = CGRect(x: 0, y: 0, width: view.frame.size.width, height: view.safeAreaInsets.top + topBarHeight)
 
 		for viewController in terminals {
@@ -112,9 +137,8 @@ class RootViewController: UIViewController {
 		}
 		#endif
 	}
-    
+
     override func viewSafeAreaInsetsDidChange() {
-        NSLog("NewTermLog: RootViewController.viewSafeAreaInsetsDidChange view.safeAreaInsets=\(view.safeAreaInsets)")
         super.viewSafeAreaInsetsDidChange()
     }
 
@@ -341,6 +365,63 @@ class RootViewController: UIViewController {
 
 	@objc func splitVertically() {
 		addTerminal(at: selectedTabIndex, axis: .horizontal)
+	}
+
+	// MARK: - Terminal quick actions
+
+	@objc func clearCurrentTerminal() {
+		sendActionToCurrentTerminal(#selector(TerminalSessionViewController.clearTerminal))
+	}
+
+	@objc func copyCurrentTerminal() {
+		sendActionToCurrentTerminal(#selector(TerminalKeyInput.copy(_:)))
+	}
+
+	@objc func pasteToCurrentTerminal() {
+		sendActionToCurrentTerminal(#selector(TerminalKeyInput.paste(_:)))
+	}
+
+	@objc func increaseFontSize() {
+		let prefs = Preferences.shared
+		prefs.fontSize = min(36, prefs.fontSize + 1)
+	}
+
+	@objc func decreaseFontSize() {
+		let prefs = Preferences.shared
+		prefs.fontSize = max(6, prefs.fontSize - 1)
+	}
+
+	@objc func resetFontSize() {
+		Preferences.shared.fontSize = 12
+	}
+
+	private func sendActionToCurrentTerminal(_ selector: Selector) {
+		guard selectedTabIndex < terminals.count else { return }
+		let splitVC = terminals[selectedTabIndex]
+		guard let sessionVC = splitVC.viewControllers?.first as? TerminalSessionViewController else { return }
+		if let responder = sessionOCResponder(in: sessionVC) {
+			responder.perform(selector)
+		}
+	}
+
+	private func sessionOCResponder(in sessionVC: TerminalSessionViewController) -> TerminalKeyInput? {
+		// Walk descendants looking for a TerminalKeyInput first responder.
+		if let input = findFirstResponder(in: sessionVC.view) as? TerminalKeyInput {
+			return input
+		}
+		return nil
+	}
+
+	private func findFirstResponder(in view: UIView) -> UIView? {
+		if view.isFirstResponder {
+			return view
+		}
+		for sub in view.subviews {
+			if let r = findFirstResponder(in: sub) {
+				return r
+			}
+		}
+		return nil
 	}
 
 }

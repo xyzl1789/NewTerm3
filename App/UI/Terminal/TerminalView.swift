@@ -16,6 +16,9 @@ class TerminalState: ObservableObject {
 	@Published var fontMetrics = FontMetrics(font: AppFont(), fontSize: 12)
 	@Published var colorMap = ColorMap(theme: AppTheme())
 	@Published var isSplitViewResizing = false
+	@Published var backgroundImagePath: String = ""
+	@Published var backgroundImageAlpha: Double = 0.3
+	@Published var backgroundImageBlur: Bool = false
 }
 
 struct TerminalView: View {
@@ -38,9 +41,8 @@ struct TerminalView: View {
                 .padding(.horizontal, Self.horizontalSpacing)
                 .background(Color(state.colorMap.background))
 			}
-            .background(Color(state.colorMap.background))
+            .background(backgroundLayer.opacity(state.isSplitViewResizing ? 0.6 : 1))
             .onChange(of: state.scroll, perform: { _ in
-                NSLog("NewTermLog: scrollTo \(state.lines.indices.last)")
                 scrollView.scrollTo(state.lines.indices.last, anchor: .bottom)
             })
 		}
@@ -53,6 +55,22 @@ struct TerminalView: View {
             view.accessibilityTextContentType(.console)
 		} else {
             view
+		}
+	}
+
+	@ViewBuilder
+	private var backgroundLayer: some View {
+		if !state.backgroundImagePath.isEmpty,
+		   let data = try? Data(contentsOf: URL(fileURLWithPath: state.backgroundImagePath)),
+		   let image = UIImage(data: data) {
+			Image(uiImage: image)
+				.resizable()
+				.scaledToFill()
+				.opacity(state.backgroundImageAlpha)
+				.blur(radius: state.backgroundImageBlur ? 12 : 0)
+				.allowsHitTesting(false)
+		} else {
+			Color(state.colorMap.background)
 		}
 	}
 }
@@ -88,7 +106,6 @@ struct TerminalSampleView: View {
 
 	init(fontMetrics: FontMetrics = FontMetrics(font: AppFont(), fontSize: 12),
 			 colorMap: ColorMap = ColorMap(theme: AppTheme())) {
-        NSLog("NewTermLog: TerminalSampleView.init \(fontMetrics) \(colorMap)")
 		self.fontMetrics = fontMetrics
 		self.colorMap = colorMap
         state.colorMap = colorMap
@@ -113,14 +130,8 @@ struct TerminalSampleView: View {
 	var body: some View {
 		TerminalView()
 			.environmentObject(state)
-            .onChange(of: colorMap, perform: {
-                NSLog("NewTermLog: new colorMap=\($0)")
-                state.colorMap = colorMap
-                stringSupplier.colorMap = $0 })
-			.onChange(of: fontMetrics, perform: {
-                NSLog("NewTermLog: new fontMetrics=\($0)")
-                state.fontMetrics = fontMetrics
-                stringSupplier.fontMetrics = $0 })
+            .onChange(of: colorMap, perform: { state.colorMap = $0; stringSupplier.colorMap = $0 })
+            .onChange(of: fontMetrics, perform: { state.fontMetrics = $0; stringSupplier.fontMetrics = $0 })
 			.onChangeOfFrame(perform: { size in
 				// Determine the screen size based on the font size
 				// TODO: Calculate the exact number of lines we need from the buffer

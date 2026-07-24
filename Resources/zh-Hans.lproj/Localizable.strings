@@ -86,5 +86,37 @@
 	<!-- Cancel button in close tab confirmation alert. -->
 	<key>CANCEL</key>
 	<string>取消</string>
+
+	<!-- Quick action: copy terminal buffer to clipboard. -->
+	<key>Copy</key>
+	<string>复制</string>
+
+	<!-- Quick action: paste clipboard to terminal. -->
+	<key>Paste</key>
+	<string>粘贴</string>
+
+	<!-- Quick action: clear terminal screen. -->
+	<key>Clear</key>
+	<string>清屏</string>
+
+	<!-- Quick action: select all terminal text. -->
+	<key>Select All</key>
+	<string>全选</string>
+
+	<!-- Quick action toolbar toggle. -->
+	<key>Quick Actions</key>
+	<string>快捷操作</string>
+
+	<!-- VoiceOver label for increasing font size shortcut. -->
+	<key>FONT_SIZE_INCREASE</key>
+	<string>增大字号</string>
+
+	<!-- VoiceOver label for decreasing font size shortcut. -->
+	<key>FONT_SIZE_DECREASE</key>
+	<string>减小字号</string>
+
+	<!-- VoiceOver label for resetting font size shortcut. -->
+	<key>FONT_SIZE_RESET</key>
+	<string>重置字号</string>
 </dict>
 </plist>

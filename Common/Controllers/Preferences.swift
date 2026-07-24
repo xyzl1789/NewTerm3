@@ -170,6 +170,38 @@ public class Preferences: NSObject, ObservableObject {
         set { objectWillChange.send(); _preferencesSyncPath=newValue; onChanged() }
 	}
 
+	@AppStorage("quickCommandsData") private var _quickCommandsData: Data = Data()
+	public var quickCommands: [String] {
+		get {
+			(try? JSONDecoder().decode([String].self, from: _quickCommandsData)) ?? []
+		}
+		set {
+			objectWillChange.send()
+			_quickCommandsData = (try? JSONEncoder().encode(newValue)) ?? Data()
+			onChanged()
+		}
+	}
+
+	@AppStorage("backgroundImagePath") private var _backgroundImagePath: String = ""
+	public var backgroundImagePath: String {
+		get { return _backgroundImagePath }
+		set { objectWillChange.send(); _backgroundImagePath = newValue; onChanged() }
+	}
+	@AppStorage("backgroundImageAlpha") private var _backgroundImageAlpha: Double = 0.3
+	public var backgroundImageAlpha: Double {
+		get { return _backgroundImageAlpha }
+		set { objectWillChange.send(); _backgroundImageAlpha = newValue; onChanged() }
+	}
+	@AppStorage("backgroundImageBlur") private var _backgroundImageBlur: Bool = false
+	public var backgroundImageBlur: Bool {
+		get { return _backgroundImageBlur }
+		set { objectWillChange.send(); _backgroundImageBlur = newValue; onChanged() }
+	}
+
+	@AppStorage("customToolbarLayoutData") public var customToolbarLayoutData: Data?
+
+	// MARK: - Locale
+
 	@AppStorage("preferredLocale") private var _preferredLocale: String = ""
 	public var preferredLocale: String {
         get { return _preferredLocale }
@@ -189,13 +221,11 @@ public class Preferences: NSObject, ObservableObject {
 	private func fontMetricsChanged() {
 		let font = AppFont.predefined[fontName] ?? AppFont()
 		fontMetrics = FontMetrics(font: font, fontSize: CGFloat(fontSize))
-        NSLog("NewTermLog: fontMetricsChanged -> size=\(fontSize) name=\(fontName) : \(AppFont.predefined[fontName])")
 	}
 
 	private func colorMapChanged() {
 		let theme = AppTheme.predefined[themeName] ?? AppTheme()
 		colorMap = ColorMap(theme: theme)
-        NSLog("NewTermLog: colorMapChanged -> \(colorMap)")
 	}
 
 }

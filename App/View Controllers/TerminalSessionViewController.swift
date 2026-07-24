@@ -10,8 +10,19 @@ import UIKit
 import os.log
 import CoreServices
 import SwiftUIX
+import SwiftUI
 import SwiftTerm
 import NewTermCommon
+import Combine
+
+// MARK: - Search State
+
+class SearchState: ObservableObject {
+	@Published var query = ""
+	@Published var matchCount = 0
+	@Published var currentIndex = 0
+	var matchingRows = [Int]()
+}
 
 class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 
@@ -35,6 +46,8 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
     private var textView: UIView!
     private var tableView: UITableView!
 	private var textViewTapGestureRecognizer: UITapGestureRecognizer!
+    private var pinchGestureRecognizer: UIPinchGestureRecognizer!
+    private var pinchStartFontSize: Double = 12
     
 	private var state = TerminalState()
     private var lines = [BufferLine]()
@@ -43,14 +56,23 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 	private var hudState = HUDViewState()
 	private var hudView: UIHostingView<AnyView>!
 
+	// Search state
+	@State private var searchVisible = false
+	private var searchView: UIHostingView<AnyView>!
+	private let searchState = SearchState()
+
+	// Quick Commands state
+	private var quickCommandsButton: UIButton!
+	private var quickCommandsPanel: UIHostingView<AnyView>?
+	private var quickCommandsPanelVisible = false
+
 	private var hasAppeared = false
 	private var hasStarted = false
 	private var failureError: Error?
 
 	private var lastAutomaticScrollOffset = CGPoint.zero
 	private var invertScrollToTop = false
-
-	private var isPickingFileForUpload = false
+    private var isPickingFileForUpload = false
 
 	override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
 		super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
@@ -75,20 +97,23 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 		title = .localize("TERMINAL", comment: "Generic title displayed before the terminal sets a proper title.")
 
 		preferencesUpdated()
-        
+
         tableView = UITableView()
         tableView.delegate = self
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.separatorInset = .zero
         tableView.backgroundColor = .clear
-        
-//        textView = TerminalHostingView(state: state)
+
         textView = tableView
 
 		textViewTapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(self.handleTextViewTap(_:)))
 		textViewTapGestureRecognizer.delegate = self
 		textView.addGestureRecognizer(textViewTapGestureRecognizer)
+
+        pinchGestureRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(self.handlePinchGesture(_:)))
+        pinchGestureRecognizer.delegate = self
+        textView.addGestureRecognizer(pinchGestureRecognizer)
 
 		keyInput.frame = view.bounds
 		keyInput.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -98,6 +123,21 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
         }
 		keyInput.terminalInputDelegate = terminalController
 		view.addSubview(keyInput)
+
+		// Floating Quick Commands button + panel
+		let qcButton = UIButton(type: .system)
+		qcButton.setImage(UIImage(systemName: "ellipsis.circle"), for: .normal)
+		qcButton.tintColor = .tint
+		qcButton.translatesAutoresizingMaskIntoConstraints = false
+		qcButton.addTarget(self, action: #selector(toggleQuickCommandsPanel), for: .touchUpInside)
+		view.addSubview(qcButton)
+		self.quickCommandsButton = qcButton
+		NSLayoutConstraint.activate([
+			qcButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+			qcButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+			qcButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 36),
+			qcButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 36)
+		])
 	}
 
 	override func viewDidLoad() {
@@ -118,10 +158,43 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 			hudView.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor)
 		])
 
+		// Search overlay
+		searchView = UIHostingView(rootView: AnyView(
+			SearchOverlayView(
+				query: self.searchState.$query,
+				matchCount: self.searchState.matchCount,
+				currentIndex: self.searchState.currentIndex,
+				onNext: { [weak self] in self?.searchNext() },
+				onPrevious: { [weak self] in self?.searchPrevious() },
+				onClose: { [weak self] in self?.hideSearch() },
+				onQueryChange: { [weak self] q in self?.runSearch(query: q) }
+			)
+			.environmentObject(self.searchState)
+		))
+		searchView.translatesAutoresizingMaskIntoConstraints = false
+		searchView.backgroundColor = .clear
+		searchView.isUserInteractionEnabled = true
+		searchView.isHidden = true
+		view.addSubview(searchView)
+
+		NSLayoutConstraint.activate([
+			searchView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+			searchView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+			searchView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+			searchView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+		])
+
 		addKeyCommand(UIKeyCommand(title: .localize("CLEAR_TERMINAL", comment: "VoiceOver label for a button that clears the terminal."),
 															 image: UIImage(systemName: "text.badge.xmark"),
 															 action: #selector(self.clearTerminal),
 															 input: "k",
+															 modifierFlags: .command))
+
+		// Cmd+F toggles search
+		addKeyCommand(UIKeyCommand(title: "Find…",
+															 image: UIImage(systemName: "magnifyingglass"),
+															 action: #selector(self.toggleSearch),
+															 input: "f",
 															 modifierFlags: .command))
 
 		#if !targetEnvironment(macCatalyst)
@@ -177,39 +250,29 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 	}
     
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
-        NSLog("NewTermLog: viewWillTransition to \(size)")
         super.viewWillTransition(to: size, with: coordinator)
         if UIDevice.current.userInterfaceIdiom == .pad {
             if keyInput.isFirstResponder {
-                //reload keyboardToolbar
                 keyInput.resignFirstResponder()
             }
         }
     }
-    
+
 	override func viewWillLayoutSubviews() {
-        NSLog("NewTermLog: TerminalSessionViewController.viewWillLayoutSubviews \(self.view.frame) \(self.view.safeAreaInsets)")
 		super.viewWillLayoutSubviews()
 		updateScreenSize()
 	}
-    
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        NSLog("NewTermLog: TerminalSessionViewController.viewDidLayoutSubviews \(self.view.frame) \(self.view.safeAreaInsets)")
-        NSLog("NewTermLog: textView frame=\(self.textView.frame) safeArea=\(self.textView.safeAreaInsets)")
-//        updateScreenSize()
     }
 
 	override func viewSafeAreaInsetsDidChange() {
-        NSLog("NewTermLog: TerminalSessionViewController.viewSafeAreaInsetsDidChange \(self.view.frame) \(view.safeAreaInsets)")
 		super.viewSafeAreaInsetsDidChange()
-//		updateScreenSize()
 	}
 
 	override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-        NSLog("NewTermLog: TerminalSessionViewController.traitCollectionDidChange \(self.view.frame) \(view.safeAreaInsets)")
 		super.traitCollectionDidChange(previousTraitCollection)
-//		updateScreenSize()
 	}
 
 	override func removeFromParent() {
@@ -256,8 +319,7 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 		if glyphSize.width == 0 || glyphSize.height == 0 {
 			fatalError("Failed to get glyph size")
 		}
-        
-        NSLog("NewTermLog: TerminalSessionViewController.updateScreenSize self=\(self.view.safeAreaLayoutGuide.layoutFrame) textView=\(textView.safeAreaLayoutGuide.layoutFrame)")
+
 		let newSize = ScreenSize(cols: UInt16(layoutSize.width / glyphSize.width),
 														 rows: UInt16(layoutSize.height / glyphSize.height.rounded(.up)),
 														 cellSize: glyphSize)
@@ -275,8 +337,137 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 		terminalController.clearTerminal()
 	}
 
+	// MARK: - Search
+
+	@objc func toggleSearch() {
+		if searchView.isHidden {
+			showSearch()
+		} else {
+			hideSearch()
+		}
+	}
+
+	private func showSearch() {
+		searchView.isHidden = false
+		searchVisible = true
+		searchState.query = ""
+		searchState.matchCount = 0
+		searchState.currentIndex = 0
+		searchState.matchingRows = []
+		// Focus the field by finding the SwiftUI-hosted UITextField
+		DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+			guard let self = self else { return }
+			if let textField = self.searchView.firstMatch(where: { $0 is UITextField }) as? UITextField {
+				textField.becomeFirstResponder()
+			}
+		}
+	}
+
+	private func hideSearch() {
+		searchView.isHidden = true
+		searchVisible = false
+		searchState.query = ""
+		searchState.matchCount = 0
+		searchState.currentIndex = 0
+		searchState.matchingRows = []
+		tableView.reloadData()
+	}
+
+	private func runSearch(query: String) {
+		guard !query.isEmpty else {
+			searchState.matchingRows = []
+			searchState.matchCount = 0
+			searchState.currentIndex = 0
+			tableView.reloadData()
+			return
+		}
+		// Run on terminal queue to read buffer safely
+		terminalController.terminalQueue.async { [weak self] in
+			let rows = self?.terminalController.searchLines(matching: query) ?? []
+			DispatchQueue.main.async {
+				guard let self = self else { return }
+				self.searchState.matchingRows = rows
+				self.searchState.matchCount = rows.count
+				self.searchState.currentIndex = rows.isEmpty ? 0 : 0
+				self.tableView.reloadData()
+				if !rows.isEmpty {
+					self.scrollToMatch(index: 0)
+				}
+			}
+		}
+	}
+
+	private func searchNext() {
+		guard !searchState.matchingRows.isEmpty else { return }
+		let next = (searchState.currentIndex + 1) % searchState.matchingRows.count
+		searchState.currentIndex = next
+		scrollToMatch(index: next)
+	}
+
+	private func searchPrevious() {
+		guard !searchState.matchingRows.isEmpty else { return }
+		let prev = (searchState.currentIndex - 1 + searchState.matchingRows.count) % searchState.matchingRows.count
+		searchState.currentIndex = prev
+		scrollToMatch(index: prev)
+	}
+
+	private func scrollToMatch(index: Int) {
+		guard index >= 0 && index < searchState.matchingRows.count else { return }
+		let row = searchState.matchingRows[index]
+		guard row >= 0 && row < lines.count else { return }
+		tableView.scrollToRow(at: IndexPath(row: row, section: 0), at: .middle, animated: true)
+	}
+
+	var isSearchVisible: Bool { searchVisible }
+	var currentSearchMatchingRows: [Int] { searchState.matchingRows }
+
+	// MARK: - Quick Commands
+
+	@objc func toggleQuickCommandsPanel() {
+		if quickCommandsPanelVisible {
+			hideQuickCommandsPanel()
+		} else {
+			showQuickCommandsPanel()
+		}
+	}
+
+	private func showQuickCommandsPanel() {
+		guard quickCommandsPanel == nil else { return }
+		let panel = QuickCommandsPanelView(
+			commands: Preferences.shared.quickCommands,
+			onSend: { [weak self] cmd in self?.sendQuickCommand(cmd) },
+			onDismiss: { [weak self] in self?.hideQuickCommandsPanel() }
+		)
+		let host = UIHostingView(rootView: AnyView(panel))
+		host.translatesAutoresizingMaskIntoConstraints = false
+		host.backgroundColor = .clear
+		host.layer.cornerRadius = 16
+		host.clipsToBounds = true
+		view.addSubview(host)
+		NSLayoutConstraint.activate([
+			host.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+			host.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 48),
+			host.widthAnchor.constraint(lessThanOrEqualToConstant: 320)
+		])
+		quickCommandsPanel = host
+		quickCommandsPanelVisible = true
+	}
+
+	private func hideQuickCommandsPanel() {
+		quickCommandsPanel?.removeFromSuperview()
+		quickCommandsPanel = nil
+		quickCommandsPanelVisible = false
+	}
+
+	private func sendQuickCommand(_ cmd: String) {
+		let payload = cmd + "\r"
+		if let data = payload.data(using: .utf8) {
+			terminalController.write(data)
+		}
+		hideQuickCommandsPanel()
+	}
+
 	private func updateIsSplitViewResizing() {
-        NSLog("NewTermLog: TerminalSessionViewController.updateIsSplitViewResizing")
 		state.isSplitViewResizing = isSplitViewResizing
 
 		if !isSplitViewResizing {
@@ -285,18 +476,77 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 	}
 
 	private func updateShowsTitleView() {
-        NSLog("NewTermLog: TerminalSessionViewController.updateShowsTitleView")
 		updateScreenSize()
 	}
 
 	// MARK: - Gestures
 
 	@objc private func handleTextViewTap(_ gestureRecognizer: UITapGestureRecognizer) {
-		if gestureRecognizer.state == .ended && !keyInput.isFirstResponder {
+		guard gestureRecognizer.state == .ended else { return }
+
+		let point = gestureRecognizer.location(in: tableView)
+
+		// Try URL detection first
+		if let indexPath = tableView.indexPathForRow(at: point),
+			 indexPath.row < lines.count,
+			 let terminal = terminalController.terminal {
+			let text = getLineText(row: indexPath.row, terminal: terminal)
+			if let urls = detectURLs(in: text) {
+				let cellWidth = terminalController.fontMetrics.boundingBox.width
+				if cellWidth > 0 {
+					let column = max(0, Int(point.x / cellWidth))
+					for urlResult in urls {
+						let nsRange = urlResult.range
+						if column >= nsRange.location && column < nsRange.location + nsRange.length {
+							UIApplication.shared.open(urlResult.url)
+							return
+						}
+					}
+				}
+			}
+		}
+
+		// No URL tapped, activate keyboard as before
+		if !keyInput.isFirstResponder {
 			keyInput.becomeFirstResponder()
 			delegate?.terminalDidBecomeActive(viewController: self)
 		}
 	}
+
+	// MARK: - URL Detection
+
+	private func detectURLs(in text: String) -> [(url: URL, range: NSRange)]? {
+		let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+		let nsText = text as NSString
+		let matches = detector?.matches(in: text, range: NSRange(location: 0, length: nsText.length))
+		return matches?.compactMap {
+			guard let url = $0.url else { return nil }
+			return (url, $0.range)
+		}
+	}
+
+	private func getLineText(row: Int, terminal: Terminal) -> String {
+		let cols = Int(terminal.cols)
+		let start = Position(col: 0, row: row)
+		let end = Position(col: cols, row: row + 1)
+		return terminal.getText(start: start, end: end)
+			.trimmingCharacters(in: .whitespacesAndNewlines)
+	}
+
+    @objc private func handlePinchGesture(_ gestureRecognizer: UIPinchGestureRecognizer) {
+        let prefs = Preferences.shared
+        switch gestureRecognizer.state {
+        case .began:
+            pinchStartFontSize = prefs.fontSize
+            gestureRecognizer.scale = 1
+        case .changed:
+            let scale = gestureRecognizer.scale
+            let newSize = max(6, min(36, round(pinchStartFontSize * scale)))
+            prefs.fontSize = newSize
+        default:
+            break
+        }
+    }
 
 	// MARK: - Lifecycle
 
@@ -315,6 +565,9 @@ class TerminalSessionViewController: BaseTerminalSplitViewControllerChild {
 	@objc private func preferencesUpdated() {
 		state.fontMetrics = terminalController.fontMetrics
 		state.colorMap = terminalController.colorMap
+		state.backgroundImagePath = Preferences.shared.backgroundImagePath
+		state.backgroundImageAlpha = Preferences.shared.backgroundImageAlpha
+		state.backgroundImageBlur = Preferences.shared.backgroundImageBlur
 	}
 }
 
@@ -326,21 +579,19 @@ extension TerminalSessionViewController: TerminalControllerDelegate {
     }
     
     func refresh(lines: inout [BufferLine], cursor: (Int,Int)) {
-        NSLog("NewTermLog: refresh lines=\(lines.count)")
         self.lines = lines
         self.cursor = cursor
         self.tableView.reloadData()
         self.scroll()
 	}
-    
+
     func scroll(animated: Bool = false) {
         state.scroll += 1
-        
+
         let lastRow = self.tableView.numberOfRows(inSection: 0) - 1
         if lastRow >= 0 {
             let indexPath = IndexPath(row: lastRow, section: 0)
             self.tableView.scrollToRow(at: indexPath, at: .bottom, animated: false)
-            NSLog("NewTermLog: scrollToRow \(indexPath)")
         }
     }
 
@@ -476,6 +727,13 @@ extension TerminalSessionViewController: UITableViewDataSource {
         let cell = SwiftUITableViewCell()
         let line = self.lines[indexPath.row]
         let view = terminalController.stringSupplier.attributedString(line: line, cursorX: indexPath.row==cursor.y ? cursor.x : -1)
+        // Wrap with search highlight if needed
+        if searchVisible && searchState.matchingRows.contains(indexPath.row) {
+            let isCurrent = searchState.matchingRows.indices.contains(searchState.currentIndex) && searchState.matchingRows[searchState.currentIndex] == indexPath.row
+            let bgColor: Color = isCurrent ? Color.yellow.opacity(0.45) : Color.yellow.opacity(0.25)
+            cell.configure(with: view.background(bgColor))
+            return cell
+        }
         cell.configure(with: view)
         return cell
     }
