@@ -417,7 +417,6 @@ struct KeyboardToolbarView: View {
             .onChangeOfFrame(perform: { _ in })
 	}
 }
-}
 
 struct KeyboardToolbarView_Previews: PreviewProvider {
 	@State private static var state = KeyboardToolbarViewState()
