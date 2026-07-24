@@ -351,7 +351,6 @@
 				4E9FB99326184356005AFCC8 /* SettingsView.swift */,
 				4E98081D2618551D00E41883 /* SettingsFontView.swift */,
 				4E9808212618601F00E41883 /* SettingsThemeView.swift */,
-			
 				9E5F06B4050A5E7EA4CB771B /* SettingsQuickCommandsView.swift */,
 				391DACCE0A1B5CEE950AE1B6 /* SettingsBackgroundView.swift */,
 				67A9101CD1AC58BDBABD1A60 /* SettingsKeyboardLayoutView.swift */,
@@ -479,7 +478,6 @@
 			children = (
 				4E85FA0027FC32D000092492 /* TerminalView.swift */,
 				4E21B0BD2958722000494475 /* HUDView.swift */,
-			
 				558C6BEE483157FD8D7B65CC /* SearchOverlayView.swift */,
 				FFD48BAFBC7D55D3B8728443 /* QuickCommandsPanelView.swift */,
 			);
@@ -506,7 +504,6 @@
 				4E9B32EA261DCFC4006A1FBC /* TextInputBase.swift */,
 				4ECEE6EC25F9B87E00FAD26B /* TerminalPasswordInputView.swift */,
 				4E18B769295AE91F00029511 /* KeyboardPreferences.swift */,
-			
 				FDD889D195DF5BDF9E4E1B95 /* ToolbarKey+Extensions.swift */,
 			);
 			path = Keyboard;
@@ -868,7 +865,6 @@
 				4E006D8C26F4AB71008D0BD2 /* SettingsGeneralView.swift in Sources */,
 				4E1028D1275C4BD9001A34AB /* SettingsAdvancedView.swift in Sources */,
 				4E21B0BC295545BE00494475 /* HapticController.swift in Sources */,
-			
 				53BFF9CDCF1B559D873238C6 /* ToolbarKey+Extensions.swift in Sources */,
 				0B479FB6BD4952B59307CCA6 /* SearchOverlayView.swift in Sources */,
 				906E729871725ABC84C5425E /* QuickCommandsPanelView.swift in Sources */,
