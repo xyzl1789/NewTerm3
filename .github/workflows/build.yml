@@ -1,10 +1,11 @@
-name: CI
+name: Build NewTerm (rootless + roothide)
 
 on:
   push:
+    branches: [main, master]
     paths-ignore:
       - '.gitignore'
-      - '**/.md'
+      - '**/*.md'
       - 'assets/**'
   pull_request:
     paths-ignore:
@@ -16,41 +17,114 @@ on:
 jobs:
   build:
     name: Build
-    runs-on: macos-12
+    runs-on: macos-latest
+    timeout-minutes: 40
+
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-    - name: Set up Procursus
-      uses: beerpiss/procursus-action@v2
-      with:
-        packages: ldid xz-utils cmark make
-        cache: true
-        cache-path: ~/__cache
-    - name: Set up Theos
-      run: git clone --recursive --depth=1 'https://github.com/theos/theos.git' ~/theos
-    - name: Install roothide headers
-      run: |
-        git clone --depth=1 'https://github.com/roothide/roothide.git' ~/roothide
-        mkdir -p ~/theos/include ~/theos/lib
-        cp ~/roothide/roothide.h ~/theos/include/
-        cp ~/roothide/libroothide.tbd ~/theos/lib/
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    - name: Build (rootful)
-      run: |
-        gmake clean package THEOS=~/theos
-        mkdir -p /tmp/debs
-        cp .theos/last_package /tmp/debs/rootful_path
-        cp "$(cat .theos/last_package)" /tmp/debs/
+      - name: Cache Theos + SDK
+        id: theos-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/theos
+          key: roothide-theos-${{ runner.os }}-v1-${{ hashFiles('.git/modules/**/HEAD') }}-${{ github.run_id }}
+        continue-on-error: true
 
-    - name: Build (roothide)
-      run: |
-        gmake clean package THEOS=~/theos ROOTHIDE=1
-        mkdir -p /tmp/debs
-        cp .theos/last_package /tmp/debs/roothide_path
-        cp "$(cat .theos/last_package)" /tmp/debs/
+      - name: Prepare roothide Theos
+        run: |
+          if [ ! -d "$THEOS_WORKSPACE/theos" ]; then
+            git clone --recursive --depth=1 https://github.com/roothide/theos.git "$THEOS_WORKSPACE/theos"
+          fi
+          echo "THEOS=$THEOS_WORKSPACE/theos" >> $GITHUB_ENV
+          echo "$THEOS_WORKSPACE/theos/bin" >> $GITHUB_PATH
+        env:
+          THEOS_WORKSPACE: ${{ github.workspace }}
 
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: NewTerm3
-        path: /tmp/debs/*.deb
+      - name: Install ldid & dpkg
+        run: |
+          brew install ldid dpkg 2>/dev/null || true
+          command -v ldid && ldid --version || true
+          command -v dpkg-deb && dpkg-deb --version || true
+
+      - name: Prepare SDKs
+        run: |
+          if [ ! -d "$THEOS/sdks/iPhoneOS16.5.sdk" ]; then
+            rm -rf "$THEOS/sdks"
+            git clone --depth=1 https://github.com/theos/sdks.git "$THEOS/sdks"
+          fi
+          ls "$THEOS/sdks/" | head -10
+
+      - name: Install roothide headers
+        run: |
+          git clone --depth=1 https://github.com/roothide/roothide.git /tmp/roothide
+          mkdir -p "$THEOS/include" "$THEOS/lib"
+          cp /tmp/roothide/roothide.h "$THEOS/include/"
+          cp /tmp/roothide/libroothide.tbd "$THEOS/lib/"
+          ls -la "$THEOS/include/roothide.h" "$THEOS/lib/libroothide.tbd"
+
+      - name: Build rootless
+        run: |
+          set -x
+          echo "=== Build rootless ==="
+          make clean 2>/dev/null || true
+          make package ROOTLESS=1 FINALPACKAGE=1 2>&1
+          mkdir -p /tmp/artifacts/rootless
+          cp packages/*.deb /tmp/artifacts/rootless/ 2>/dev/null \
+            || find . -name "*.deb" -exec cp {} /tmp/artifacts/rootless/ \;
+          ls -la /tmp/artifacts/rootless/
+
+      - name: Build roothide
+        run: |
+          set -x
+          echo "=== Build roothide ==="
+          make clean 2>/dev/null || true
+          make package ROOTHIDE=1 FINALPACKAGE=1 2>&1
+          mkdir -p /tmp/artifacts/roothide
+          cp packages/*.deb /tmp/artifacts/roothide/ 2>/dev/null \
+            || find . -name "*.deb" -exec cp {} /tmp/artifacts/roothide/ \;
+          ls -la /tmp/artifacts/roothide/
+
+      - name: Collect debs
+        if: always()
+        run: |
+          mkdir -p /tmp/packages
+          find /tmp/artifacts -name "*.deb" -exec cp {} /tmp/packages/ \; 2>/dev/null || echo "无 debs"
+          echo "=== 汇总 ==="
+          ls -la /tmp/packages/
+
+      - name: Verify debs
+        run: |
+          echo "=== 验证 deb 信息 ==="
+          for deb in /tmp/packages/*.deb; do
+            [ -f "$deb" ] || continue
+            name=$(basename "$deb")
+            echo "--- $name ---"
+            dpkg-deb -c "$deb" 2>/dev/null | head -5
+            echo " Architecture 信息:"
+            dpkg-deb -I "$deb" 2>/dev/null | grep -E "Architecture|Package|Version" || echo "  未知"
+            if dpkg-deb -c "$deb" 2>/dev/null | grep -q "/var/jb/"; then
+              echo "  [rootless] 含 /var/jb/ 路径"
+            else
+              echo "  [roothide] 无 /var/jb/ 路径"
+            fi
+            echo ""
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: NewTerm-debs
+          path: /tmp/packages/*.deb
+          retention-days: 90
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: /tmp/packages/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
